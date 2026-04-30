@@ -38,12 +38,12 @@ async function sendPayloadToSubscription(
     });
 
     if (!res.ok) {
-      return { ok: false, error: `Push failed with status: ${res.status}` };
+      return { ok: false, error: `[${subscription.webhook_url}] Push failed with status: ${res.status}` };
     }
 
     return { ok: true };
   } catch (e: any) {
-    return { ok: false, error: e.message || "Network error" };
+    return { ok: false, error: `[${subscription.webhook_url}] ${e.message || "Network error"}` };
   }
 }
 
@@ -144,7 +144,7 @@ export async function dispatchEventDirect(
       .update({
         status: failed === 0 ? "completed" : delivered > 0 ? "completed" : "dlq",
         processed_at: new Date().toISOString(),
-        error_message: lastError || null,
+        error_message: lastError || (delivered > 0 ? `Delivered to ${delivered} sub(s)` : null),
         attempts: 1,
       })
       .eq("id", eventRecord.id);
