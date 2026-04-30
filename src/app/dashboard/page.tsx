@@ -10,9 +10,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/client";
 import { getWebhookEventsByLocation } from "@/lib/supabase/queries";
-import { Cable, CheckCircle2, Copy, KeyRound, ShieldAlert } from "lucide-react";
+import fs from "fs";
+import { Cable, KeyRound, ShieldAlert } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import path from "path";
+import { AiSkill } from "./components/AiSkill";
 import { CredentialBox } from "./components/CredentialBox";
 import { DashboardShell } from "./components/DashboardShell";
 import { SetupGuide } from "./components/SetupGuide";
@@ -67,10 +70,18 @@ export default async function DashboardPage({
     error_description?: string;
   }>;
 }) {
+  // Read AI Skill content
+  let skillContent = "";
+  try {
+    const skillPath = path.join(process.cwd(), "src/app/dashboard/SKILL.md");
+    skillContent = fs.readFileSync(skillPath, "utf8");
+  } catch (e) {
+    console.error("Failed to read SKILL.md", e);
+  }
+
   const params = await searchParams;
   const cookieStore = await cookies();
 
-  // GHL often uses location_id (snake_case) in query params
   const rawLocationId =
     (params as any).locationId || (params as any).location_id;
   const locationId =
@@ -128,9 +139,10 @@ export default async function DashboardPage({
       locationId={locationId}
     >
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="mb-6 grid w-full grid-cols-2 max-w-[400px]">
+        <TabsList className="mb-6 grid w-full grid-cols-3 max-w-[600px]">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="webhooks">Webhook Logs</TabsTrigger>
+          <TabsTrigger value="ai-skill">Agent SKILL</TabsTrigger>
         </TabsList>
 
         <TabsContent
@@ -201,10 +213,10 @@ export default async function DashboardPage({
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <CredentialBox 
-                      value={locationId || ""} 
-                      label="Location ID" 
-                      variant="primary" 
+                    <CredentialBox
+                      value={locationId || ""}
+                      label="Location ID"
+                      variant="primary"
                     />
                   </CardContent>
                 </Card>
@@ -228,10 +240,10 @@ export default async function DashboardPage({
                   <CardContent className="space-y-4">
                     {bridgeKey ? (
                       <div className="space-y-4">
-                        <CredentialBox 
-                          value={bridgeKey} 
-                          label="Bridge Key" 
-                          variant="indigo" 
+                        <CredentialBox
+                          value={bridgeKey}
+                          label="Bridge Key"
+                          variant="indigo"
                         />
                         <TestConnection
                           bridgeKey={bridgeKey}
@@ -255,10 +267,10 @@ export default async function DashboardPage({
                       <div className="space-y-4">
                         {keys.slice(0, 1).map((key) => (
                           <div key={key.id} className="space-y-4">
-                            <CredentialBox 
-                              value={key.key_value} 
-                              label="Bridge Key" 
-                              variant="indigo" 
+                            <CredentialBox
+                              value={key.key_value}
+                              label="Bridge Key"
+                              variant="indigo"
                             />
                             <div className="flex items-center justify-between">
                               <Badge
@@ -293,6 +305,48 @@ export default async function DashboardPage({
               </div>
 
               <SetupGuide />
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent
+          value="ai-skill"
+          className="space-y-6 mt-6 animate-in fade-in slide-in-from-bottom-4 duration-500"
+        >
+          {!locationId ? (
+            <Alert>
+              <AlertTitle>Missing location context</AlertTitle>
+              <AlertDescription>
+                Open this dashboard from your GoHighLevel account to view the AI
+                Skill content.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="space-y-6">
+              <AiSkill skillContent={skillContent} />
+              <Card className="border-none bg-muted/30">
+                <CardHeader>
+                  <CardTitle className="text-base">Why use this?</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground space-y-2">
+                  <p>
+                    This skill file contains a formal definition of every
+                    capability in your GHL-n8n Bridge. By giving this to an AI,
+                    you enable it to:
+                  </p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>
+                      Build complex n8n workflows without manual documentation
+                      reading.
+                    </li>
+                    <li>Correctly map GHL custom fields to n8n parameters.</li>
+                    <li>
+                      Utilize the Custom Request mode for advanced GHL V2 API
+                      features.
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
             </div>
           )}
         </TabsContent>

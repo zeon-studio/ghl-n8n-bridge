@@ -1,0 +1,10 @@
+# GHL n8n Integration
+
+Automate GoHighLevel using custom n8n bridge nodes.
+
+## Skills & Documentation
+- [GHL n8n Bridge Skill](file:///Users/somrat/Development/GoHighLevel/ghl-n8n/ghl-n8n-app/src/app/dashboard/SKILL.md): Comprehensive guide for AI agents to build n8n workflows with GHL Bridge nodes.
+
+## Repository Structure
+- `n8n-nodes-ghl-bridge/`: Source code for the n8n nodes.
+- `ghl-n8n-app/`: The dashboard application.
