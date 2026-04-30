@@ -11,9 +11,12 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/client";
 import { getWebhookEventsByLocation } from "@/lib/supabase/queries";
-import { KeyRound, ShieldAlert, Sparkles } from "lucide-react";
+import { Cable, KeyRound, ShieldAlert, Sparkles } from "lucide-react";
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { DashboardShell } from "./components/DashboardShell";
+import { TestConnection } from "./components/TestConnection";
+import { WorkflowTemplates } from "./components/WorkflowTemplates";
 
 export const dynamic = "force-dynamic";
 
@@ -162,11 +165,16 @@ export default async function DashboardPage({
               <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Location ID
               </p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <code className="flex-1 rounded-md border bg-background px-3 py-2 font-mono text-sm break-all select-all">
+              <div className="flex items-center justify-between rounded-md border bg-background pr-1 pl-3 py-1 font-mono text-sm">
+                <code className="break-all select-all flex-1 py-1">
                   {locationId}
                 </code>
-                <CopyValueButton value={locationId} label="Copy location ID" />
+                <CopyValueButton
+                  value={locationId}
+                  label="Copy location ID"
+                  iconOnly
+                  className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
+                />
               </div>
             </div>
 
@@ -179,38 +187,65 @@ export default async function DashboardPage({
                 Bridge Keys
               </p>
               {isNewInstall && bridgeKey ? (
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <code className="flex-1 rounded-md border bg-background px-3 py-2 font-mono text-sm break-all select-all">
-                    {bridgeKey}
-                  </code>
-                  <CopyValueButton value={bridgeKey} label="Copy key" />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between rounded-md border bg-background pr-1 pl-3 py-1 font-mono text-sm">
+                    <code className="break-all select-all flex-1 py-1">
+                      {bridgeKey}
+                    </code>
+                    <CopyValueButton
+                      value={bridgeKey}
+                      label="Copy key"
+                      iconOnly
+                      className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
+                    />
+                  </div>
+                  <TestConnection
+                    bridgeKey={bridgeKey}
+                    locationId={locationId}
+                    baseUrl={appBaseUrl}
+                  />
                 </div>
               ) : keys.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No bridge keys found. Reinstall the marketplace app to
-                  provision a key.
+                  No bridge keys found.{" "}
+                  <Link
+                    href="/api/auth/ghl"
+                    className="underline hover:text-foreground font-medium"
+                  >
+                    Reinstall
+                  </Link>{" "}
+                  the marketplace app to provision a key.
                 </p>
               ) : (
                 <div className="space-y-3">
                   {keys.map((key) => (
                     <div key={key.id} className="space-y-2">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <code className="flex-1 rounded-md border bg-background px-3 py-2 font-mono text-sm break-all select-all">
-                          {key.key_value}
-                        </code>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-1 items-center justify-between rounded-md border bg-background pr-1 pl-3 py-1 font-mono text-sm">
+                          <code className="break-all select-all flex-1 py-1">
+                            {key.key_value}
+                          </code>
+                          <CopyValueButton
+                            value={key.key_value}
+                            label="Copy key"
+                            iconOnly
+                            className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
+                          />
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
                           <Badge
                             variant={key.is_active ? "default" : "secondary"}
                           >
                             {key.is_active ? "Active" : "Inactive"}
                           </Badge>
-                          <CopyValueButton
-                            value={key.key_value}
-                            label="Copy key"
-                          />
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <TestConnection
+                        bridgeKey={key.key_value}
+                        locationId={locationId}
+                        baseUrl={appBaseUrl}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
                         Created {new Date(key.created_at).toLocaleDateString()}
                       </p>
                     </div>
@@ -218,8 +253,45 @@ export default async function DashboardPage({
                 </div>
               )}
             </div>
+
+            <Separator />
+
+            {/* n8n Integration Instructions */}
+            <div className="mt-4 space-y-3 rounded-xl border bg-muted/30 p-5">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Cable className="size-4 text-primary" />
+                How to connect with n8n
+              </h3>
+              <ol className="space-y-2.5 pl-5 text-sm text-muted-foreground marker:text-muted-foreground/70 list-decimal">
+                <li>
+                  Open your n8n workspace and navigate to{" "}
+                  <strong>Credentials</strong>.
+                </li>
+                <li>
+                  Click <strong>Add Credential</strong> and search for{" "}
+                  <strong>GHL Bridge API</strong>.
+                </li>
+                <li>
+                  Paste your <strong>Bridge Key</strong>
+                  {locationId ? " and " : ""}
+                  {locationId && <strong>Location ID</strong>} into the
+                  credential fields.
+                </li>
+                <li>
+                  You can now use the <strong>GHL Bridge</strong> action node
+                  and <strong>GHL Bridge Trigger</strong> node in your
+                  workflows!
+                </li>
+              </ol>
+            </div>
           </CardContent>
         </Card>
+      )}
+
+      {locationId && (
+        <div className="mt-4">
+          <WorkflowTemplates />
+        </div>
       )}
 
       {/* ── Webhook status ── */}

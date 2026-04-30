@@ -8,10 +8,12 @@ export function CopyValueButton({
   value,
   label = "Copy",
   className,
+  iconOnly = false,
 }: {
   value: string;
   label?: string;
   className?: string;
+  iconOnly?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -28,14 +30,15 @@ export function CopyValueButton({
   return (
     <Button
       type="button"
-      variant="outline"
-      size="xs"
+      variant={iconOnly ? "ghost" : "outline"}
+      size={iconOnly ? "icon" : "xs"}
       onClick={onCopy}
       className={className}
       aria-label={`${label} value`}
+      title={iconOnly ? label : undefined}
     >
       {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-      {copied ? "Copied" : label}
+      {!iconOnly && (copied ? "Copied" : label)}
     </Button>
   );
 }

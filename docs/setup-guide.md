@@ -113,6 +113,5 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000" # Change for production
 3. **Using in n8n**:
    - Start n8n.
    - Go to **Credentials** -> Create new **GHL Bridge API**.
-   - Set the **Base URL** to your backend URL (e.g., `http://localhost:3000`).
    - Set the **Bridge Key**. *You get this key when you install your App into a GHL Sub-Account (it redirects to your dashboard with `?key=brg_...`).*
    - You can now use the **GHL Bridge** action node and **GHL Bridge Trigger** node in your workflows!

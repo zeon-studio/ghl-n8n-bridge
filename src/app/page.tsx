@@ -1,5 +1,4 @@
 import { ModeToggle } from "@/components/mode-toggle";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -10,30 +9,24 @@ import {
 import { Cable, Mail, ShieldCheck, Zap } from "lucide-react";
 import Link from "next/link";
 
-const marketplaceHref =
-  process.env.NEXT_PUBLIC_GHL_MARKETPLACE_INSTALL_URL ||
-  (process.env.GHL_MARKETPLACE_APP_ID
-    ? `https://marketplace.gohighlevel.com/integration/${process.env.GHL_MARKETPLACE_APP_ID}`
-    : "https://marketplace.gohighlevel.com/");
-
 const FEATURES = [
   {
     n: 1,
     icon: Cable,
-    title: "Fast Connection",
-    desc: "One install flow, one bridge key, and your workflows are ready.",
+    title: "One-Click Setup",
+    desc: "Connect instantly via OAuth. Generate a single bridge key and your n8n workflows are ready to go.",
   },
   {
     n: 2,
     icon: ShieldCheck,
-    title: "Secure by Default",
-    desc: "Requests are signed and validated before your automations run.",
+    title: "Token Broker Architecture",
+    desc: "We handle OAuth token refreshes securely in the background so your automations never break.",
   },
   {
     n: 3,
     icon: Zap,
-    title: "Production Ready",
-    desc: "Built for webhook scale with retry, dispatch, and clean key management.",
+    title: "AI Agent Ready",
+    desc: "Empower your AI agents to interact with GoHighLevel natively through standard n8n workflows.",
   },
 ];
 
@@ -45,12 +38,12 @@ export default function Home() {
       <div className="relative mx-auto flex w-full max-w-2xl flex-col items-center gap-8 text-center">
         {/* ── Top bar ── */}
         <header className="flex w-full items-center justify-between">
-          <Badge
-            variant="secondary"
-            className="gap-2 px-3 py-1 text-sm font-medium"
-          >
-            GoHighLevel Marketplace App
-          </Badge>
+          <div className="flex items-center gap-2 font-bold tracking-tight">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Cable className="size-5" />
+            </div>
+            <span className="text-lg">n8n GHL Bridge</span>
+          </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/support"
@@ -64,28 +57,28 @@ export default function Home() {
         </header>
 
         {/* ── Hero ── */}
-        <div className="space-y-4">
+        <div className="space-y-4 pt-20">
           <h1 className="font-heading text-4xl font-extrabold tracking-tight sm:text-5xl">
-            Connect GHL to n8n <span className="text-primary">in seconds</span>
+            The Missing Link Between <br className="hidden sm:block" />
+            <span className="text-primary">GoHighLevel & n8n</span>
           </h1>
           <p className="mx-auto max-w-lg text-lg text-muted-foreground">
-            Install from the GoHighLevel Marketplace, grab your bridge key, and
-            route events into n8n without brittle custom middleware.
+            Connect sub-accounts in one click. Use our custom n8n nodes to
+            automate workflows and integrate AI agents—without managing complex
+            API tokens.
           </p>
         </div>
 
         {/* ── CTAs ── */}
         <div className="flex flex-wrap items-center justify-center gap-4">
           <a
-            href={marketplaceHref}
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/api/auth/ghl"
             className={buttonVariants({
               size: "lg",
               className: "px-8 font-semibold",
             })}
           >
-            Open GHL Marketplace
+            Connect GoHighLevel
           </a>
           <Link
             href="/dashboard"

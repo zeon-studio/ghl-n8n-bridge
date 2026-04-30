@@ -15,8 +15,8 @@ export const GHL_SCOPES = [
   "forms.write",
   "workflows.readonly",
   "locations.readonly",
+  "locations/customFields.readonly",
   "locations/customFields.write",
-  "locations/customValues.write",
   "users.readonly",
 ];
 
