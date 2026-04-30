@@ -1,4 +1,3 @@
-import { CopyValueButton } from "@/components/copy-value-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,11 +10,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/client";
 import { getWebhookEventsByLocation } from "@/lib/supabase/queries";
-import { Cable, CheckCircle2, KeyRound, ShieldAlert } from "lucide-react";
+import { Cable, CheckCircle2, Copy, KeyRound, ShieldAlert } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { CredentialBox } from "./components/CredentialBox";
 import { DashboardShell } from "./components/DashboardShell";
 import { SetupGuide } from "./components/SetupGuide";
+import { SuccessBanner } from "./components/SuccessBanner";
 import { TestConnection } from "./components/TestConnection";
 import { WorkflowTemplates } from "./components/WorkflowTemplates";
 
@@ -68,13 +69,15 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
   const cookieStore = await cookies();
-  
+
   // GHL often uses location_id (snake_case) in query params
-  const rawLocationId = (params as any).locationId || (params as any).location_id;
-  const locationId = rawLocationId ?? 
-    cookieStore.get("ghl_location_id")?.value ?? 
+  const rawLocationId =
+    (params as any).locationId || (params as any).location_id;
+  const locationId =
+    rawLocationId ??
+    cookieStore.get("ghl_location_id")?.value ??
     cookieStore.get("location_id")?.value;
-  
+
   const bridgeKey = params.key;
   const oauthError = params.error;
   const oauthErrorDescription = params.error_description;
@@ -83,7 +86,7 @@ export default async function DashboardPage({
   // Fetch bridge keys
   const supabase = getSupabaseServiceRoleClient();
   let keys: BridgeKey[] = [];
-  
+
   if (locationId) {
     // Primary join via bridge_locations - location_id is here
     const { data: locs } = await supabase
@@ -99,7 +102,7 @@ export default async function DashboardPage({
           id: k.id,
           key_value: k.bridge_key,
           created_at: k.created_at,
-          is_active: !!k.is_active
+          is_active: !!k.is_active,
         }));
     }
   }
@@ -176,30 +179,8 @@ export default async function DashboardPage({
 
           {locationId && (
             <div className="space-y-6">
-              {/* 1. Success Message - Compact version */}
-              <div className="flex items-center justify-between gap-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 px-6 py-4 backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-700">
-                <div className="flex items-center gap-4">
-                  <div className="flex size-10 items-center justify-center rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/20">
-                    <CheckCircle2 className="size-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-bold text-foreground tracking-tight">
-                      {isNewInstall
-                        ? "Connection Successful!"
-                        : "Bridge is Active"}
-                    </h2>
-                    <p className="text-xs text-muted-foreground font-medium">
-                      {isNewInstall
-                        ? "Your account is linked. Follow the guide below to start."
-                        : "Your GHL account is securely connected to the n8n bridge."}
-                    </p>
-                  </div>
-                </div>
-                <div className="hidden sm:flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  System Online
-                </div>
-              </div>
+              {/* 1. Success Message - Dismissible version */}
+              <SuccessBanner isNewInstall={isNewInstall} />
 
               {/* 2. Credentials Card */}
               <div className="grid gap-6 md:grid-cols-2">
@@ -220,17 +201,11 @@ export default async function DashboardPage({
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="group relative flex items-center justify-between rounded-2xl border-2 border-muted bg-background/50 p-2 pl-4 transition-all hover:border-primary/30">
-                      <code className="font-mono text-sm font-bold tracking-tight text-foreground/80 break-all select-all py-2">
-                        {locationId}
-                      </code>
-                      <CopyValueButton
-                        value={locationId}
-                        label="Copy location ID"
-                        iconOnly
-                        className="size-10 shrink-0 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all"
-                      />
-                    </div>
+                    <CredentialBox 
+                      value={locationId || ""} 
+                      label="Location ID" 
+                      variant="primary" 
+                    />
                   </CardContent>
                 </Card>
 
@@ -253,17 +228,11 @@ export default async function DashboardPage({
                   <CardContent className="space-y-4">
                     {bridgeKey ? (
                       <div className="space-y-4">
-                        <div className="group relative flex items-center justify-between rounded-2xl border-2 border-muted bg-background/50 p-2 pl-4 transition-all hover:border-indigo-500/30">
-                          <code className="font-mono text-sm font-bold tracking-tight text-foreground/80 break-all select-all py-2">
-                            {bridgeKey}
-                          </code>
-                          <CopyValueButton
-                            value={bridgeKey}
-                            label="Copy key"
-                            iconOnly
-                            className="size-10 shrink-0 rounded-xl hover:bg-indigo-500 hover:text-white transition-all"
-                          />
-                        </div>
+                        <CredentialBox 
+                          value={bridgeKey} 
+                          label="Bridge Key" 
+                          variant="indigo" 
+                        />
                         <TestConnection
                           bridgeKey={bridgeKey}
                           locationId={locationId}
@@ -286,17 +255,11 @@ export default async function DashboardPage({
                       <div className="space-y-4">
                         {keys.slice(0, 1).map((key) => (
                           <div key={key.id} className="space-y-4">
-                            <div className="group relative flex items-center justify-between rounded-2xl border-2 border-muted bg-background/50 p-2 pl-4 transition-all hover:border-indigo-500/30">
-                              <code className="font-mono text-sm font-bold tracking-tight text-foreground/80 break-all select-all py-2">
-                                {key.key_value}
-                              </code>
-                              <CopyValueButton
-                                value={key.key_value}
-                                label="Copy key"
-                                iconOnly
-                                className="size-10 shrink-0 rounded-xl hover:bg-indigo-500 hover:text-white transition-all"
-                              />
-                            </div>
+                            <CredentialBox 
+                              value={key.key_value} 
+                              label="Bridge Key" 
+                              variant="indigo" 
+                            />
                             <div className="flex items-center justify-between">
                               <Badge
                                 variant={
