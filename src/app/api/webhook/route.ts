@@ -1,8 +1,12 @@
 import { WebhookError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { dispatchEventDirect, enqueueEvent } from "@/lib/webhook/queue";
+import {
+  dispatchEventDirect,
+  dispatchPendingEvents,
+  enqueueEvent,
+} from "@/lib/webhook/queue";
 import { verifyGhlWebhookSignature } from "@/lib/webhook/verify";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -91,9 +95,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, mode: "direct", ...result });
     }
 
-    // 3. Enqueue event
+    // 3. Enqueue event and dispatch in background
     await enqueueEvent(locationId, eventType, payload);
-    logger.info("Webhook enqueued successfully", { locationId, eventType });
+
+    // Use Next.js after() to process the queue without blocking the GHL response
+    after(async () => {
+      try {
+        await dispatchPendingEvents(10);
+        logger.info("Background webhook dispatch completed");
+      } catch (e) {
+        logger.error("Background webhook dispatch failed", e);
+      }
+    });
+
+    logger.info("Webhook enqueued for background processing", {
+      locationId,
+      eventType,
+    });
 
     return NextResponse.json({ success: true, mode: "queued" });
   } catch (error) {

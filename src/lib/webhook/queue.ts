@@ -17,7 +17,7 @@ interface DirectDispatchResult {
 async function sendPayloadToSubscription(
   subscription: any,
   payload: WebhookEventPayload,
-): Promise<boolean> {
+): Promise<{ ok: boolean; error?: string }> {
   try {
     const payloadStr = JSON.stringify(payload);
     const headers: Record<string, string> = {
@@ -34,21 +34,21 @@ async function sendPayloadToSubscription(
       method: "POST",
       headers,
       body: payloadStr,
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(10000), // Increased timeout to 10s
     });
 
     if (!res.ok) {
-      throw new Error(`Push failed with status: ${res.status}`);
+      return { ok: false, error: `Push failed with status: ${res.status}` };
     }
 
-    return true;
-  } catch {
-    return false;
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message || "Network error" };
   }
 }
 
 /**
- * Direct-delivery mode for low-latency pass-through (no queue persistence).
+ * Direct-delivery mode for low-latency pass-through (no queue persistence by default, but we log for the dashboard).
  */
 export async function dispatchEventDirect(
   locationId: string,
@@ -57,6 +57,24 @@ export async function dispatchEventDirect(
 ): Promise<DirectDispatchResult> {
   const supabase = getSupabaseServiceRoleClient();
 
+  // Create an initial log entry for visibility in the dashboard
+  const eventId =
+    payload.id ||
+    crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+  const idempotencyKey = `ghl_direct_${eventId}`;
+
+  const { data: eventRecord } = await supabase
+    .from("webhook_events")
+    .insert({
+      location_id: locationId,
+      event_type: eventType,
+      payload: payload as any,
+      idempotency_key: idempotencyKey,
+      status: "processing",
+    })
+    .select("id")
+    .single();
+
   const { data: subscriptions } = await supabase
     .from("webhook_subscriptions")
     .select("*")
@@ -64,6 +82,16 @@ export async function dispatchEventDirect(
     .eq("is_active", true);
 
   if (!subscriptions || subscriptions.length === 0) {
+    if (eventRecord) {
+      await supabase
+        .from("webhook_events")
+        .update({
+          status: "completed",
+          error_message: "No active subscriptions found for this location",
+          processed_at: new Date().toISOString(),
+        })
+        .eq("id", eventRecord.id);
+    }
     return { matchedSubscriptions: 0, delivered: 0, failed: 0 };
   }
 
@@ -73,14 +101,25 @@ export async function dispatchEventDirect(
   );
 
   if (matched.length === 0) {
+    if (eventRecord) {
+      await supabase
+        .from("webhook_events")
+        .update({
+          status: "completed",
+          error_message: "No matching subscriptions for this event type",
+          processed_at: new Date().toISOString(),
+        })
+        .eq("id", eventRecord.id);
+    }
     return { matchedSubscriptions: 0, delivered: 0, failed: 0 };
   }
 
   let delivered = 0;
   let failed = 0;
+  let lastError: string | undefined;
 
   for (const sub of matched) {
-    const ok = await sendPayloadToSubscription(sub, payload);
+    const { ok, error } = await sendPayloadToSubscription(sub, payload);
     if (ok) {
       delivered += 1;
       logger.info("Direct webhook pushed to n8n", {
@@ -89,11 +128,26 @@ export async function dispatchEventDirect(
       });
     } else {
       failed += 1;
+      lastError = error;
       logger.warn("Direct webhook push failed", {
         eventType,
         url: sub.webhook_url,
+        error,
       });
     }
+  }
+
+  // Finalize the log entry
+  if (eventRecord) {
+    await supabase
+      .from("webhook_events")
+      .update({
+        status: failed === 0 ? "completed" : delivered > 0 ? "completed" : "dlq",
+        processed_at: new Date().toISOString(),
+        error_message: lastError || null,
+        attempts: 1,
+      })
+      .eq("id", eventRecord.id);
   }
 
   return {
@@ -142,12 +196,12 @@ async function pushEventToSubscription(
   supabase: ReturnType<typeof getSupabaseServiceRoleClient>,
 ) {
   try {
-    const ok = await sendPayloadToSubscription(
+    const { ok, error } = await sendPayloadToSubscription(
       subscription,
       eventData.payload as WebhookEventPayload,
     );
     if (!ok) {
-      throw new Error("Push failed");
+      throw new Error(error || "Push failed");
     }
 
     // Success
