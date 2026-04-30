@@ -8,8 +8,11 @@ const manrope = Manrope({ subsets: ["latin"], variable: "--font-sans" });
 const syne = Syne({ subsets: ["latin"], variable: "--font-heading" });
 
 export const metadata: Metadata = {
-  title: "GHL n8n Integration",
+  title: "n8n GHL Bridge",
   description: "Marketplace application connecting GoHighLevel with n8n.",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({

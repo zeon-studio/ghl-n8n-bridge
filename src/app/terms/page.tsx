@@ -2,7 +2,7 @@ import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Terms of Service | GHL n8n Bridge",
+  title: "Terms of Service | n8n GHL Bridge",
 };
 
 export default function TermsPage() {

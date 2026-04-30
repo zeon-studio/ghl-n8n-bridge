@@ -2,7 +2,7 @@ import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Privacy Policy | GHL n8n Bridge",
+  title: "Privacy Policy | n8n GHL Bridge",
 };
 
 export default function PrivacyPage() {
@@ -31,7 +31,7 @@ export default function PrivacyPage() {
             1. Information We Process
           </h2>
           <p>
-            We process installation and integration data required to run this
+            We process installation and bridge data required to run this
             marketplace app, including GoHighLevel account identifiers, location
             identifiers, OAuth token metadata, webhook delivery metadata, and
             bridge key relationships.
@@ -51,7 +51,7 @@ export default function PrivacyPage() {
           </h2>
           <p>
             Sensitive credentials such as refresh tokens are encrypted at rest.
-            Data is retained only as long as needed to operate the integration
+            Data is retained only as long as needed to operate the bridge
             or meet legal obligations.
           </p>
 

@@ -11,7 +11,7 @@ import { LifeBuoy, Mail, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Support | GHL n8n Bridge",
+  title: "Support | n8n GHL Bridge",
 };
 
 const supportEmail = "zeonstudiohg@gmail.com";
@@ -30,7 +30,7 @@ export default function SupportPage() {
         <div className="space-y-3">
           <Badge className="w-fit">Support</Badge>
           <h1 className="font-heading text-4xl tracking-tight sm:text-5xl">
-            Need help with your integration?
+            Need help with your GHL Bridge?
           </h1>
           <p className="max-w-2xl text-muted-foreground">
             Reach us for installation help, OAuth troubleshooting, key rotation,

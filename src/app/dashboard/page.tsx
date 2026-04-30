@@ -108,7 +108,7 @@ export default async function DashboardPage({
 
   return (
     <DashboardShell
-      title="Integration control center"
+      title="Bridge Control Center"
       description="Manage your bridge connection and continue setup from one place."
       locationId={locationId}
     >
@@ -264,7 +264,7 @@ export default async function DashboardPage({
 
             <Separator />
 
-            {/* n8n Integration Instructions */}
+            {/* n8n Bridge Instructions */}
             <div className="mt-4 space-y-3 rounded-xl border bg-muted/30 p-5">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Cable className="size-4 text-primary" />
