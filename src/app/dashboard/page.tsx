@@ -428,11 +428,6 @@ export default async function DashboardPage({
                                   ).toLocaleString()}
                                 </p>
                               ) : null}
-                              {event.error_message ? (
-                                <p className="text-xs text-destructive">
-                                  {event.error_message}
-                                </p>
-                              ) : null}
                             </div>
                             <div className="flex items-center gap-2">
                               <Badge
