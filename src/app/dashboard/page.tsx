@@ -8,14 +8,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/client";
 import { getWebhookEventsByLocation } from "@/lib/supabase/queries";
-import { Cable, KeyRound, ShieldAlert, Sparkles } from "lucide-react";
+import { Cable, CheckCircle2, KeyRound, ShieldAlert } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardShell } from "./components/DashboardShell";
+import { SetupGuide } from "./components/SetupGuide";
 import { TestConnection } from "./components/TestConnection";
 import { WorkflowTemplates } from "./components/WorkflowTemplates";
 
@@ -68,8 +68,13 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
   const cookieStore = await cookies();
-  const locationId =
-    params.locationId ?? cookieStore.get("ghl_location_id")?.value;
+  
+  // GHL often uses location_id (snake_case) in query params
+  const rawLocationId = (params as any).locationId || (params as any).location_id;
+  const locationId = rawLocationId ?? 
+    cookieStore.get("ghl_location_id")?.value ?? 
+    cookieStore.get("location_id")?.value;
+  
   const bridgeKey = params.key;
   const oauthError = params.error;
   const oauthErrorDescription = params.error_description;
@@ -78,17 +83,24 @@ export default async function DashboardPage({
   // Fetch bridge keys
   const supabase = getSupabaseServiceRoleClient();
   let keys: BridgeKey[] = [];
+  
   if (locationId) {
+    // Primary join via bridge_locations - location_id is here
     const { data: locs } = await supabase
       .from("bridge_locations")
-      .select(
-        `bridge_key_id, bridge_keys ( id, key_value, created_at, is_active )`,
-      )
+      .select(`bridge_keys ( id, bridge_key, created_at, is_active )`)
       .eq("location_id", locationId);
-    if (locs) {
-      keys = (locs as any[])
-        .map((l) => l.bridge_keys)
-        .filter((k): k is BridgeKey => Boolean(k?.id));
+
+    if (locs && locs.length > 0) {
+      keys = locs
+        .flatMap((l: any) => l.bridge_keys)
+        .filter((k: any) => Boolean(k?.id))
+        .map((k: any) => ({
+          id: k.id,
+          key_value: k.bridge_key,
+          created_at: k.created_at,
+          is_active: !!k.is_active
+        }));
     }
   }
 
@@ -118,310 +130,331 @@ export default async function DashboardPage({
           <TabsTrigger value="webhooks">Webhook Logs</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6 mt-0">
-          {/* ── OAuth error ── */}
+        <TabsContent
+          value="overview"
+          className="space-y-10 mt-6 animate-in fade-in slide-in-from-bottom-4 duration-500"
+        >
           {oauthError && (
-        <Alert variant="destructive">
-          <ShieldAlert className="size-4" />
-          <AlertTitle>OAuth setup failed: {oauthError}</AlertTitle>
-          <AlertDescription className="space-y-2">
-            <p>{oauthErrorDescription || "Unable to finish authorization."}</p>
-            {oauthError === "invalid_grant" && (
-              <p>
-                Use a freshly generated install flow from the GHL Marketplace
-                and do not reuse a callback URL code.
-              </p>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* ── Missing location ── */}
-      {!locationId && (
-        <Alert>
-          <AlertTitle>Missing location context</AlertTitle>
-          <AlertDescription>
-            Access this dashboard from inside your GoHighLevel account so we can
-            identify your location.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* ── Connection card: location ID + bridge keys merged ── */}
-      {locationId && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {isNewInstall ? (
-                <>
-                  <Sparkles className="size-4" />
-                  App installed successfully
-                </>
-              ) : (
-                "You are connected"
-              )}
-            </CardTitle>
-            <CardDescription>
-              {isNewInstall
-                ? "Copy the bridge key below into your n8n GHL Bridge credential."
-                : "Your location is detected. Copy your bridge key and location ID to configure n8n."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Location ID row */}
-            <div>
-              <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Location ID
-              </p>
-              <div className="flex items-center justify-between rounded-md border bg-background pr-1 pl-3 py-1 font-mono text-sm">
-                <code className="break-all select-all flex-1 py-1">
-                  {locationId}
-                </code>
-                <CopyValueButton
-                  value={locationId}
-                  label="Copy location ID"
-                  iconOnly
-                  className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
-                />
+            <Alert
+              variant="destructive"
+              className="border-destructive/20 bg-destructive/5 backdrop-blur-sm"
+            >
+              <ShieldAlert className="size-5" />
+              <div className="ml-2">
+                <AlertTitle className="text-lg font-bold">
+                  Connection Failed
+                </AlertTitle>
+                <AlertDescription className="mt-1 opacity-90">
+                  <p>
+                    {oauthErrorDescription || "Unable to finish authorization."}
+                  </p>
+                  {oauthError === "invalid_grant" && (
+                    <p className="mt-2 text-xs font-medium">
+                      Tip: Use a freshly generated install flow from the GHL
+                      Marketplace and do not reuse a callback URL code.
+                    </p>
+                  )}
+                </AlertDescription>
               </div>
-            </div>
+            </Alert>
+          )}
 
-            <Separator />
+          {!locationId && (
+            <Alert className="bg-amber-500/5 border-amber-500/20 backdrop-blur-sm">
+              <ShieldAlert className="size-5 text-amber-500" />
+              <div className="ml-2">
+                <AlertTitle className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                  Location Context Missing
+                </AlertTitle>
+                <AlertDescription className="mt-1 opacity-90">
+                  Please access this dashboard from inside your GoHighLevel
+                  account sidebar to correctly identify your location.
+                </AlertDescription>
+              </div>
+            </Alert>
+          )}
 
-            {/* Bridge keys */}
-            <div>
-              <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                <KeyRound className="size-3" />
-                Bridge Keys
-              </p>
-              {isNewInstall && bridgeKey ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between rounded-md border bg-background pr-1 pl-3 py-1 font-mono text-sm">
-                    <code className="break-all select-all flex-1 py-1">
-                      {bridgeKey}
-                    </code>
-                    <CopyValueButton
-                      value={bridgeKey}
-                      label="Copy key"
-                      iconOnly
-                      className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
-                    />
+          {locationId && (
+            <div className="space-y-6">
+              {/* 1. Success Message - Compact version */}
+              <div className="flex items-center justify-between gap-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 px-6 py-4 backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-700">
+                <div className="flex items-center gap-4">
+                  <div className="flex size-10 items-center justify-center rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/20">
+                    <CheckCircle2 className="size-6 text-white" />
                   </div>
-                  <TestConnection
-                    bridgeKey={bridgeKey}
-                    locationId={locationId}
-                    baseUrl={appBaseUrl}
-                  />
+                  <div>
+                    <h2 className="text-sm font-bold text-foreground tracking-tight">
+                      {isNewInstall
+                        ? "Connection Successful!"
+                        : "Bridge is Active"}
+                    </h2>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      {isNewInstall
+                        ? "Your account is linked. Follow the guide below to start."
+                        : "Your GHL account is securely connected to the n8n bridge."}
+                    </p>
+                  </div>
                 </div>
-              ) : keys.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No bridge keys found.{" "}
-                  <Link
-                    href="/api/auth/ghl"
-                    className="underline hover:text-foreground font-medium"
-                  >
-                    Reinstall
-                  </Link>{" "}
-                  the marketplace app to provision a key.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {keys.map((key) => (
-                    <div key={key.id} className="space-y-2">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <div className="flex flex-1 items-center justify-between rounded-md border bg-background pr-1 pl-3 py-1 font-mono text-sm">
-                          <code className="break-all select-all flex-1 py-1">
-                            {key.key_value}
+                <div className="hidden sm:flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  System Online
+                </div>
+              </div>
+
+              {/* 2. Credentials Card */}
+              <div className="grid gap-6 md:grid-cols-2">
+                <Card className="border-none bg-linear-to-br from-background via-muted/50 to-background shadow-lg hover:shadow-xl transition-shadow duration-300">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <Cable className="size-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg font-bold">
+                          Location ID
+                        </CardTitle>
+                        <CardDescription>
+                          Required for n8n credentials
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="group relative flex items-center justify-between rounded-2xl border-2 border-muted bg-background/50 p-2 pl-4 transition-all hover:border-primary/30">
+                      <code className="font-mono text-sm font-bold tracking-tight text-foreground/80 break-all select-all py-2">
+                        {locationId}
+                      </code>
+                      <CopyValueButton
+                        value={locationId}
+                        label="Copy location ID"
+                        iconOnly
+                        className="size-10 shrink-0 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none bg-linear-to-br from-background via-muted/50 to-background shadow-lg hover:shadow-xl transition-shadow duration-300">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-500">
+                        <KeyRound className="size-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg font-bold">
+                          Bridge Key
+                        </CardTitle>
+                        <CardDescription>
+                          Secret API key for n8n
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {bridgeKey ? (
+                      <div className="space-y-4">
+                        <div className="group relative flex items-center justify-between rounded-2xl border-2 border-muted bg-background/50 p-2 pl-4 transition-all hover:border-indigo-500/30">
+                          <code className="font-mono text-sm font-bold tracking-tight text-foreground/80 break-all select-all py-2">
+                            {bridgeKey}
                           </code>
                           <CopyValueButton
-                            value={key.key_value}
+                            value={bridgeKey}
                             label="Copy key"
                             iconOnly
-                            className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
+                            className="size-10 shrink-0 rounded-xl hover:bg-indigo-500 hover:text-white transition-all"
                           />
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <Badge
-                            variant={key.is_active ? "default" : "secondary"}
-                          >
-                            {key.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
+                        <TestConnection
+                          bridgeKey={bridgeKey}
+                          locationId={locationId}
+                          baseUrl={appBaseUrl}
+                        />
                       </div>
-                      <TestConnection
-                        bridgeKey={key.key_value}
-                        locationId={locationId}
-                        baseUrl={appBaseUrl}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Created {new Date(key.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ) : keys.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-4 text-center space-y-3">
+                        <p className="text-sm text-muted-foreground font-medium">
+                          No active bridge keys found.
+                        </p>
+                        <Link
+                          href="/api/auth/ghl"
+                          className="inline-flex items-center rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm hover:scale-105 transition-transform"
+                        >
+                          Generate New Key
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {keys.slice(0, 1).map((key) => (
+                          <div key={key.id} className="space-y-4">
+                            <div className="group relative flex items-center justify-between rounded-2xl border-2 border-muted bg-background/50 p-2 pl-4 transition-all hover:border-indigo-500/30">
+                              <code className="font-mono text-sm font-bold tracking-tight text-foreground/80 break-all select-all py-2">
+                                {key.key_value}
+                              </code>
+                              <CopyValueButton
+                                value={key.key_value}
+                                label="Copy key"
+                                iconOnly
+                                className="size-10 shrink-0 rounded-xl hover:bg-indigo-500 hover:text-white transition-all"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <Badge
+                                variant={
+                                  key.is_active ? "default" : "secondary"
+                                }
+                                className="rounded-full px-3"
+                              >
+                                {key.is_active ? "● Active" : "Inactive"}
+                              </Badge>
+                              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
+                                Created{" "}
+                                {new Date(key.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <TestConnection
+                              bridgeKey={key.key_value}
+                              locationId={locationId}
+                              baseUrl={appBaseUrl}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="relative group">
+                <div className="absolute -inset-1 rounded-3xl bg-linear-to-r from-primary/20 via-indigo-500/20 to-primary/20 opacity-0 blur-xl group-hover:opacity-100 transition-opacity duration-500" />
+                <WorkflowTemplates />
+              </div>
+
+              <SetupGuide />
             </div>
-
-            <Separator />
-
-            {/* n8n Bridge Instructions */}
-            <div className="mt-4 space-y-3 rounded-xl border bg-muted/30 p-5">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Cable className="size-4 text-primary" />
-                How to connect with n8n
-              </h3>
-              <ol className="space-y-2.5 pl-5 text-sm text-muted-foreground marker:text-muted-foreground/70 list-decimal">
-                <li>
-                  Open your n8n workspace and navigate to{" "}
-                  <strong>Credentials</strong>.
-                </li>
-                <li>
-                  Click <strong>Add Credential</strong> and search for{" "}
-                  <strong>GHL Bridge API</strong>.
-                </li>
-                <li>
-                  Paste your <strong>Bridge Key</strong>
-                  {locationId ? " and " : ""}
-                  {locationId && <strong>Location ID</strong>} into the
-                  credential fields.
-                </li>
-                <li>
-                  You can now use the <strong>GHL Bridge</strong> action node
-                  and <strong>GHL Bridge Trigger</strong> node in your
-                  workflows!
-                </li>
-              </ol>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {locationId && (
-        <div className="mt-4">
-          <WorkflowTemplates />
-        </div>
-      )}
-
-      {/* ── Webhook status ── */}
+          )}
         </TabsContent>
-        
-        <TabsContent value="webhooks" className="space-y-6 mt-0">
-      <div>
-        {!locationId ? (
-          <Alert>
-            <AlertTitle>Missing location context</AlertTitle>
-            <AlertDescription>
-              Open this dashboard from your GoHighLevel account so webhook
-              history can be scoped to your location.
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-4">
-              <Card className="hover:border-primary/50 transition-colors">
-                <CardHeader>
-                  <CardTitle className="text-base">Completed</CardTitle>
-                  <CardDescription>Successfully delivered</CardDescription>
-                </CardHeader>
-                <CardContent className="text-3xl font-semibold">
-                  {completed}
-                </CardContent>
-              </Card>
-              <Card className="hover:border-primary/50 transition-colors">
-                <CardHeader>
-                  <CardTitle className="text-base">Processing</CardTitle>
-                  <CardDescription>Currently dispatching</CardDescription>
-                </CardHeader>
-                <CardContent className="text-3xl font-semibold">
-                  {processing}
-                </CardContent>
-              </Card>
-              <Card className="hover:border-primary/50 transition-colors">
-                <CardHeader>
-                  <CardTitle className="text-base">Retrying</CardTitle>
-                  <CardDescription>Failed, scheduled for retry</CardDescription>
-                </CardHeader>
-                <CardContent className="text-3xl font-semibold">
-                  {retrying}
-                </CardContent>
-              </Card>
-              <Card className="hover:border-primary/50 transition-colors">
-                <CardHeader>
-                  <CardTitle className="text-base">DLQ</CardTitle>
-                  <CardDescription>Max retries exhausted</CardDescription>
-                </CardHeader>
-                <CardContent className="text-3xl font-semibold">
-                  {dlq}
-                </CardContent>
-              </Card>
-            </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent events</CardTitle>
-                <CardDescription>
-                  Latest 60 events for this location.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {events.length === 0 ? (
-                  <Alert>
-                    <AlertTitle>No webhook events yet</AlertTitle>
-                    <AlertDescription>
-                      Trigger an action in GoHighLevel and refresh this page to
-                      see delivery logs.
-                    </AlertDescription>
-                  </Alert>
-                ) : (
-                  events.map((event) => (
-                    <div
-                      key={event.id}
-                      className="rounded-xl border bg-background p-4"
-                    >
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium">
-                            {event.event_type}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Created{" "}
-                            {event.created_at
-                              ? new Date(event.created_at).toLocaleString()
-                              : "-"}
-                          </p>
-                          {event.next_retry_at ? (
-                            <p className="text-xs text-muted-foreground">
-                              Next retry{" "}
-                              {new Date(event.next_retry_at).toLocaleString()}
-                            </p>
-                          ) : null}
-                          {event.error_message ? (
-                            <p className="text-xs text-destructive">
-                              {event.error_message}
-                            </p>
-                          ) : null}
+        <TabsContent value="webhooks" className="space-y-6 mt-0">
+          <div>
+            {!locationId ? (
+              <Alert>
+                <AlertTitle>Missing location context</AlertTitle>
+                <AlertDescription>
+                  Open this dashboard from your GoHighLevel account so webhook
+                  history can be scoped to your location.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-4">
+                  <Card className="hover:border-primary/50 transition-colors">
+                    <CardHeader>
+                      <CardTitle className="text-base">Completed</CardTitle>
+                      <CardDescription>Successfully delivered</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-3xl font-semibold">
+                      {completed}
+                    </CardContent>
+                  </Card>
+                  <Card className="hover:border-primary/50 transition-colors">
+                    <CardHeader>
+                      <CardTitle className="text-base">Processing</CardTitle>
+                      <CardDescription>Currently dispatching</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-3xl font-semibold">
+                      {processing}
+                    </CardContent>
+                  </Card>
+                  <Card className="hover:border-primary/50 transition-colors">
+                    <CardHeader>
+                      <CardTitle className="text-base">Retrying</CardTitle>
+                      <CardDescription>
+                        Failed, scheduled for retry
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-3xl font-semibold">
+                      {retrying}
+                    </CardContent>
+                  </Card>
+                  <Card className="hover:border-primary/50 transition-colors">
+                    <CardHeader>
+                      <CardTitle className="text-base">DLQ</CardTitle>
+                      <CardDescription>Max retries exhausted</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-3xl font-semibold">
+                      {dlq}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recent events</CardTitle>
+                    <CardDescription>
+                      Latest 60 events for this location.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {events.length === 0 ? (
+                      <Alert>
+                        <AlertTitle>No webhook events yet</AlertTitle>
+                        <AlertDescription>
+                          Trigger an action in GoHighLevel and refresh this page
+                          to see delivery logs.
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      events.map((event) => (
+                        <div
+                          key={event.id}
+                          className="rounded-xl border bg-background p-4"
+                        >
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium">
+                                {event.event_type}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Created{" "}
+                                {event.created_at
+                                  ? new Date(event.created_at).toLocaleString()
+                                  : "-"}
+                              </p>
+                              {event.next_retry_at ? (
+                                <p className="text-xs text-muted-foreground">
+                                  Next retry{" "}
+                                  {new Date(
+                                    event.next_retry_at,
+                                  ).toLocaleString()}
+                                </p>
+                              ) : null}
+                              {event.error_message ? (
+                                <p className="text-xs text-destructive">
+                                  {event.error_message}
+                                </p>
+                              ) : null}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className="font-mono text-[10px] uppercase"
+                              >
+                                {event.attempts ?? 0}/{event.max_attempts ?? 3}
+                              </Badge>
+                              <Badge variant={statusVariant(event.status)}>
+                                {event.status || "unknown"}
+                              </Badge>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className="font-mono text-[10px] uppercase"
-                          >
-                            {event.attempts ?? 0}/{event.max_attempts ?? 3}
-                          </Badge>
-                          <Badge variant={statusVariant(event.status)}>
-                            {event.status || "unknown"}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-      </TabsContent>
+        </TabsContent>
       </Tabs>
     </DashboardShell>
   );
