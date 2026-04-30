@@ -14,6 +14,7 @@ import { getWebhookEventsByLocation } from "@/lib/supabase/queries";
 import { Cable, KeyRound, ShieldAlert, Sparkles } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardShell } from "./components/DashboardShell";
 import { TestConnection } from "./components/TestConnection";
 import { WorkflowTemplates } from "./components/WorkflowTemplates";
@@ -111,8 +112,15 @@ export default async function DashboardPage({
       description="Manage your bridge connection and continue setup from one place."
       locationId={locationId}
     >
-      {/* ── OAuth error ── */}
-      {oauthError && (
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="mb-6 grid w-full grid-cols-2 max-w-[400px]">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="webhooks">Webhook Logs</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6 mt-0">
+          {/* ── OAuth error ── */}
+          {oauthError && (
         <Alert variant="destructive">
           <ShieldAlert className="size-4" />
           <AlertTitle>OAuth setup failed: {oauthError}</AlertTitle>
@@ -295,8 +303,10 @@ export default async function DashboardPage({
       )}
 
       {/* ── Webhook status ── */}
+        </TabsContent>
+        
+        <TabsContent value="webhooks" className="space-y-6 mt-0">
       <div>
-        <h2 className="mb-3 text-lg font-semibold">Webhook Status</h2>
         {!locationId ? (
           <Alert>
             <AlertTitle>Missing location context</AlertTitle>
@@ -411,6 +421,8 @@ export default async function DashboardPage({
           </div>
         )}
       </div>
+      </TabsContent>
+      </Tabs>
     </DashboardShell>
   );
 }

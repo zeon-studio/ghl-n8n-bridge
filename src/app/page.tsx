@@ -35,15 +35,18 @@ export default function Home() {
     <main className="relative min-h-screen overflow-hidden px-4 py-12 sm:px-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-linear-to-b from-primary/5 to-transparent" />
 
-      <div className="relative mx-auto flex w-full max-w-2xl flex-col items-center gap-8 text-center">
+      <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center gap-8 text-center">
         {/* ── Top bar ── */}
         <header className="flex w-full items-center justify-between">
-          <div className="flex items-center gap-2 font-bold tracking-tight">
+          <Link
+            href="/"
+            className="flex items-center gap-2 font-bold tracking-tight hover:opacity-80 transition-opacity"
+          >
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Cable className="size-5" />
             </div>
             <span className="text-lg">n8n GHL Bridge</span>
-          </div>
+          </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/support"
