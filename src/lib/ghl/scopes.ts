@@ -17,6 +17,8 @@ export const GHL_SCOPES = [
   "locations.readonly",
   "locations/customFields.readonly",
   "locations/customFields.write",
+  "locations/customValues.readonly",
+  "locations/customValues.write",
   "users.readonly",
 ];
 
