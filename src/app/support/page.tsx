@@ -14,7 +14,7 @@ export const metadata = {
   title: "Support | n8n GHL Bridge",
 };
 
-const supportEmail = "zeonstudiohg@gmail.com";
+const supportEmail = "zeonstudiohq@gmail.com";
 const marketplaceHref =
   process.env.NEXT_PUBLIC_GHL_MARKETPLACE_INSTALL_URL ||
   (process.env.GHL_MARKETPLACE_APP_ID

@@ -51,8 +51,8 @@ export default function PrivacyPage() {
           </h2>
           <p>
             Sensitive credentials such as refresh tokens are encrypted at rest.
-            Data is retained only as long as needed to operate the bridge
-            or meet legal obligations.
+            Data is retained only as long as needed to operate the bridge or
+            meet legal obligations.
           </p>
 
           <h2 className="text-xl font-semibold text-foreground">
@@ -67,10 +67,10 @@ export default function PrivacyPage() {
           <p>
             Privacy requests and questions can be sent to{" "}
             <a
-              href="mailto:zeonstudiohg@gmail.com"
+              href="mailto:zeonstudiohq@gmail.com"
               className="text-foreground underline underline-offset-4"
             >
-              zeonstudiohg@gmail.com
+              zeonstudiohq@gmail.com
             </a>
             .
           </p>
