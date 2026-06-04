@@ -139,7 +139,7 @@ export default async function DashboardPage({
       locationId={locationId}
     >
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="mb-6 grid w-full grid-cols-3 max-w-[600px]">
+        <TabsList className="mb-6 grid w-full grid-cols-3 max-w-150">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="webhooks">Webhook Logs</TabsTrigger>
           <TabsTrigger value="ai-skill">Agent SKILL</TabsTrigger>

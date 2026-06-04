@@ -1,8 +1,7 @@
 {
   "name": "ghl-n8n-app",
   "version": "1.0.0",
-  "private": true,
-  "author": "Zeon Studio <zeonstudiohq@gmail.com> (https://zeon.studio)",
+  "author": "Zeon Studio",
   "license": "MIT",
   "scripts": {
     "dev": "next dev",
