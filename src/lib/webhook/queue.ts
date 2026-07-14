@@ -1,6 +1,6 @@
 import crypto from "crypto";
+import { db } from "../db/client";
 import { logger } from "../logger";
-import { getSupabaseServiceRoleClient } from "../supabase/client";
 
 export interface WebhookEventPayload {
   type: string;
@@ -55,42 +55,33 @@ export async function dispatchEventDirect(
   eventType: string,
   payload: WebhookEventPayload,
 ): Promise<DirectDispatchResult> {
-  const supabase = getSupabaseServiceRoleClient();
-
   // Create an initial log entry for visibility in the dashboard
   const eventId =
     payload.id ||
     crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
   const idempotencyKey = `ghl_direct_${eventId}`;
 
-  const { data: eventRecord } = await supabase
-    .from("webhook_events")
-    .insert({
-      location_id: locationId,
-      event_type: eventType,
-      payload: payload as any,
-      idempotency_key: idempotencyKey,
-      status: "processing",
-    })
-    .select("id")
-    .single();
+  const { rows: eventRows } = await db.query(
+    `INSERT INTO webhook_events (location_id, event_type, payload, idempotency_key, status)
+     VALUES ($1, $2, $3, $4, 'processing')
+     RETURNING id`,
+    [locationId, eventType, JSON.stringify(payload), idempotencyKey],
+  );
+  const eventRecord = eventRows[0];
 
-  const { data: subscriptions } = await supabase
-    .from("webhook_subscriptions")
-    .select("*")
-    .eq("location_id", locationId)
-    .eq("is_active", true);
+  const { rows: subscriptions } = await db.query(
+    "SELECT * FROM webhook_subscriptions WHERE location_id = $1 AND is_active = true",
+    [locationId],
+  );
 
   if (!subscriptions || subscriptions.length === 0) {
     if (eventRecord) {
-      await supabase
-        .from("webhook_events")
-        .update({
-          status: "completed",
-          error_message: "No active subscriptions found for this location",
-          processed_at: new Date().toISOString(),
-        })
-        .eq("id", eventRecord.id);
+      await db.query(
+        `UPDATE webhook_events
+         SET status = 'completed', error_message = $2, processed_at = now()
+         WHERE id = $1`,
+        [eventRecord.id, "No active subscriptions found for this location"],
+      );
     }
     return { matchedSubscriptions: 0, delivered: 0, failed: 0 };
   }
@@ -102,14 +93,12 @@ export async function dispatchEventDirect(
 
   if (matched.length === 0) {
     if (eventRecord) {
-      await supabase
-        .from("webhook_events")
-        .update({
-          status: "completed",
-          error_message: "No matching subscriptions for this event type",
-          processed_at: new Date().toISOString(),
-        })
-        .eq("id", eventRecord.id);
+      await db.query(
+        `UPDATE webhook_events
+         SET status = 'completed', error_message = $2, processed_at = now()
+         WHERE id = $1`,
+        [eventRecord.id, "No matching subscriptions for this event type"],
+      );
     }
     return { matchedSubscriptions: 0, delivered: 0, failed: 0 };
   }
@@ -139,15 +128,16 @@ export async function dispatchEventDirect(
 
   // Finalize the log entry
   if (eventRecord) {
-    await supabase
-      .from("webhook_events")
-      .update({
-        status: failed === 0 ? "completed" : delivered > 0 ? "completed" : "dlq",
-        processed_at: new Date().toISOString(),
-        error_message: lastError || (delivered > 0 ? `Delivered to ${delivered} sub(s)` : null),
-        attempts: 1,
-      })
-      .eq("id", eventRecord.id);
+    await db.query(
+      `UPDATE webhook_events
+       SET status = $2, processed_at = now(), error_message = $3, attempts = 1
+       WHERE id = $1`,
+      [
+        eventRecord.id,
+        failed === 0 ? "completed" : delivered > 0 ? "completed" : "dlq",
+        lastError || (delivered > 0 ? `Delivered to ${delivered} sub(s)` : null),
+      ],
+    );
   }
 
   return {
@@ -165,36 +155,30 @@ export async function enqueueEvent(
   eventType: string,
   payload: WebhookEventPayload,
 ) {
-  const supabase = getSupabaseServiceRoleClient();
-
   // Use event ID from payload if available, else hash the payload for idempotency
   const eventId =
     payload.id ||
     crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
   const idempotencyKey = `ghl_${eventId}`;
 
-  const { error } = await supabase.from("webhook_events").insert({
-    location_id: locationId,
-    event_type: eventType,
-    payload: payload as any,
-    idempotency_key: idempotencyKey,
-    status: "pending",
-  });
-
-  // Ignore unique constraint violation (duplicate event)
-  if (error && error.code !== "23505") {
-    throw error;
+  try {
+    await db.query(
+      `INSERT INTO webhook_events (location_id, event_type, payload, idempotency_key, status)
+       VALUES ($1, $2, $3, $4, 'pending')`,
+      [locationId, eventType, JSON.stringify(payload), idempotencyKey],
+    );
+  } catch (error: any) {
+    // Ignore unique constraint violation (duplicate event)
+    if (error?.code !== "23505") {
+      throw error;
+    }
   }
 }
 
 /**
  * Dispatches an event to registered n8n webhook URLs.
  */
-async function pushEventToSubscription(
-  subscription: any,
-  eventData: any,
-  supabase: ReturnType<typeof getSupabaseServiceRoleClient>,
-) {
+async function pushEventToSubscription(subscription: any, eventData: any) {
   try {
     const { ok, error } = await sendPayloadToSubscription(
       subscription,
@@ -205,10 +189,10 @@ async function pushEventToSubscription(
     }
 
     // Success
-    await supabase
-      .from("webhook_events")
-      .update({ status: "completed", processed_at: new Date().toISOString() })
-      .eq("id", eventData.id);
+    await db.query(
+      "UPDATE webhook_events SET status = 'completed', processed_at = now() WHERE id = $1",
+      [eventData.id],
+    );
 
     logger.info("Successfully pushed webhook to n8n", {
       eventId: eventData.id,
@@ -227,10 +211,10 @@ async function pushEventToSubscription(
     const maxAttempts = eventData.max_attempts || 3;
 
     if (attempts >= maxAttempts) {
-      await supabase
-        .from("webhook_events")
-        .update({ status: "dlq", attempts, error_message: String(error) })
-        .eq("id", eventData.id);
+      await db.query(
+        "UPDATE webhook_events SET status = 'dlq', attempts = $2, error_message = $3 WHERE id = $1",
+        [eventData.id, attempts, String(error)],
+      );
     } else {
       // Exponential backoff for retry: next retry in 2^attempts minutes
       const delayMinutes = Math.pow(2, attempts);
@@ -238,15 +222,12 @@ async function pushEventToSubscription(
         Date.now() + delayMinutes * 60000,
       ).toISOString();
 
-      await supabase
-        .from("webhook_events")
-        .update({
-          status: "failed",
-          attempts,
-          next_retry_at: nextRetryAt,
-          error_message: String(error),
-        })
-        .eq("id", eventData.id);
+      await db.query(
+        `UPDATE webhook_events
+         SET status = 'failed', attempts = $2, next_retry_at = $3, error_message = $4
+         WHERE id = $1`,
+        [eventData.id, attempts, nextRetryAt, String(error)],
+      );
     }
 
     return false;
@@ -257,48 +238,42 @@ async function pushEventToSubscription(
  * Dispatches pending events. Designed to be called by Vercel Cron or immediately after enqueueing.
  */
 export async function dispatchPendingEvents(limit: number = 50) {
-  const supabase = getSupabaseServiceRoleClient();
-
   // 1. Fetch pending or ready-to-retry events
-  // Note: For real concurrency control at scale, we'd use SKIP LOCKED in raw SQL via RPC.
-  // For Vercel Cron single-instance running, this is generally okay.
-  const { data: events, error } = await supabase
-    .from("webhook_events")
-    .select("*")
-    .in("status", ["pending", "failed"])
-    .or("next_retry_at.is.null,next_retry_at.lte.now()")
-    .order("created_at", { ascending: true })
-    .limit(limit);
+  const { rows: events } = await db.query(
+    `SELECT * FROM webhook_events
+     WHERE status IN ('pending', 'failed')
+       AND (next_retry_at IS NULL OR next_retry_at <= now())
+     ORDER BY created_at ASC
+     LIMIT $1`,
+    [limit],
+  );
 
-  if (error || !events || events.length === 0) return 0;
+  if (!events || events.length === 0) return 0;
 
   // Mark as processing
   const eventIds = events.map((e) => e.id);
-  await supabase
-    .from("webhook_events")
-    .update({ status: "processing" })
-    .in("id", eventIds);
+  await db.query(
+    "UPDATE webhook_events SET status = 'processing' WHERE id = ANY($1::uuid[])",
+    [eventIds],
+  );
 
   let processedCount = 0;
 
   for (const event of events) {
     // Find active subscriptions for this location
-    const { data: subscriptions } = await supabase
-      .from("webhook_subscriptions")
-      .select("*")
-      .eq("location_id", event.location_id)
-      .eq("is_active", true);
+    const { rows: subscriptions } = await db.query(
+      "SELECT * FROM webhook_subscriptions WHERE location_id = $1 AND is_active = true",
+      [event.location_id],
+    );
 
     if (!subscriptions || subscriptions.length === 0) {
       // No active subscriptions, mark as completed (dropped)
-      await supabase
-        .from("webhook_events")
-        .update({
-          status: "completed",
-          processed_at: new Date().toISOString(),
-          error_message: "No active subscriptions",
-        })
-        .eq("id", event.id);
+      await db.query(
+        `UPDATE webhook_events
+         SET status = 'completed', processed_at = now(), error_message = $2
+         WHERE id = $1`,
+        [event.id, "No active subscriptions"],
+      );
       processedCount++;
       continue;
     }
@@ -310,7 +285,7 @@ export async function dispatchPendingEvents(limit: number = 50) {
         sub.event_types.includes("*") ||
         sub.event_types.includes(event.event_type)
       ) {
-        await pushEventToSubscription(sub, event, supabase);
+        await pushEventToSubscription(sub, event);
         processedCount++;
       }
     }

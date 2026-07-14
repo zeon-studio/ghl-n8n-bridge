@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseServiceRoleClient } from '@/lib/supabase/client';
+import { db } from '@/lib/db/client';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -21,24 +21,22 @@ export async function DELETE(
       return NextResponse.json({ error: 'Subscription ID is required' }, { status: 400 });
     }
 
-    const supabase = getSupabaseServiceRoleClient();
-
     // 1. Validate bridge key
-    const { data: keyData, error: keyError } = await supabase
-      .from('bridge_keys')
-      .select('id, is_active')
-      .eq('bridge_key', bridgeKey)
-      .single();
+    const { rows: keyRows } = await db.query(
+      'SELECT id, is_active FROM bridge_keys WHERE bridge_key = $1',
+      [bridgeKey],
+    );
+    const keyData = keyRows[0];
 
-    if (keyError || !keyData || !keyData.is_active) {
+    if (!keyData || !keyData.is_active) {
       return NextResponse.json({ error: 'Invalid or inactive bridge key' }, { status: 401 });
     }
 
     // 2. Get authorized locations
-    const { data: locations } = await supabase
-      .from('bridge_locations')
-      .select('location_id')
-      .eq('bridge_key_id', keyData.id);
+    const { rows: locations } = await db.query(
+      'SELECT location_id FROM bridge_locations WHERE bridge_key_id = $1',
+      [keyData.id],
+    );
 
     const locationIds = locations?.map(l => l.location_id) || [];
 
@@ -47,13 +45,12 @@ export async function DELETE(
     }
 
     // 3. Delete subscription (ensure it belongs to authorized location)
-    const { error: deleteError } = await supabase
-      .from('webhook_subscriptions')
-      .delete()
-      .eq('id', subscriptionId)
-      .in('location_id', locationIds);
-
-    if (deleteError) {
+    try {
+      await db.query(
+        'DELETE FROM webhook_subscriptions WHERE id = $1 AND location_id = ANY($2::text[])',
+        [subscriptionId, locationIds],
+      );
+    } catch (deleteError) {
       logger.error('Failed to delete webhook subscription', deleteError);
       return NextResponse.json({ error: 'Failed to delete subscription' }, { status: 500 });
     }

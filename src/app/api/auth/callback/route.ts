@@ -5,8 +5,8 @@ import {
   getInstalledLocations,
   getLocationToken,
 } from "@/lib/ghl/oauth";
+import { db } from "@/lib/db/client";
 import { logger } from "@/lib/logger";
-import { getSupabaseServiceRoleClient } from "@/lib/supabase/client";
 import {
   createBridgeKey,
   linkBridgeLocation,
@@ -66,17 +66,14 @@ export async function GET(req: NextRequest) {
       raw_data: tokenRes as any,
     });
 
-    const supabase = getSupabaseServiceRoleClient();
     let finalBridgeKey = "";
     let redirectLocationId = locationId ?? "";
 
     // Check if an active bridge key already exists for this company
-    const { data: existingBridgeKeys } = await supabase
-      .from("bridge_keys")
-      .select("id, bridge_key")
-      .eq("installation_id", installation.id)
-      .eq("is_active", true)
-      .limit(1);
+    const { rows: existingBridgeKeys } = await db.query(
+      "SELECT id, bridge_key FROM bridge_keys WHERE installation_id = $1 AND is_active = true LIMIT 1",
+      [installation.id],
+    );
 
     let bridgeKeyRecord =
       existingBridgeKeys && existingBridgeKeys.length > 0

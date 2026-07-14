@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseServiceRoleClient } from '@/lib/supabase/client';
+import { db } from '@/lib/db/client';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -20,24 +20,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid payload. Requires webhook_url and event_types array' }, { status: 400 });
     }
 
-    const supabase = getSupabaseServiceRoleClient();
-
     // 1. Validate bridge key
-    const { data: keyData, error: keyError } = await supabase
-      .from('bridge_keys')
-      .select('id, is_active')
-      .eq('bridge_key', bridgeKey)
-      .single();
+    const { rows: keyRows } = await db.query(
+      'SELECT id, is_active FROM bridge_keys WHERE bridge_key = $1',
+      [bridgeKey],
+    );
+    const keyData = keyRows[0];
 
-    if (keyError || !keyData || !keyData.is_active) {
+    if (!keyData || !keyData.is_active) {
       return NextResponse.json({ error: 'Invalid or inactive bridge key' }, { status: 401 });
     }
 
     // 2. Get associated locations
-    const { data: locations } = await supabase
-      .from('bridge_locations')
-      .select('location_id')
-      .eq('bridge_key_id', keyData.id);
+    const { rows: locations } = await db.query(
+      'SELECT location_id FROM bridge_locations WHERE bridge_key_id = $1',
+      [keyData.id],
+    );
 
     if (!locations || locations.length === 0) {
       return NextResponse.json({ error: 'No locations associated with this bridge key' }, { status: 403 });
@@ -45,20 +43,20 @@ export async function POST(req: NextRequest) {
 
     // For v1, we assume one location per bridge key for webhooks, or we register for all of them
     // Let's register for all locations attached to this key
-    const subscriptions = locations.map(loc => ({
-      location_id: loc.location_id,
-      webhook_url,
-      event_types,
-      secret: secret || null,
-      is_active: true
-    }));
-
-    const { data: createdSubs, error: subError } = await supabase
-      .from('webhook_subscriptions')
-      .insert(subscriptions)
-      .select();
-
-    if (subError) {
+    let createdSubs;
+    try {
+      createdSubs = await Promise.all(
+        locations.map(async (loc) => {
+          const { rows } = await db.query(
+            `INSERT INTO webhook_subscriptions (location_id, webhook_url, event_types, secret, is_active)
+             VALUES ($1, $2, $3, $4, true)
+             RETURNING *`,
+            [loc.location_id, webhook_url, event_types, secret || null],
+          );
+          return rows[0];
+        }),
+      );
+    } catch (subError) {
       logger.error('Failed to create webhook subscription', subError);
       return NextResponse.json({ error: 'Failed to create subscription' }, { status: 500 });
     }

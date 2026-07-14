@@ -1,4 +1,4 @@
-import { getSupabaseServiceRoleClient } from '../supabase/client';
+import { db } from '../db/client';
 import { tryAcquireRefreshLock, upsertLocationToken } from '../supabase/queries';
 import { refreshAccessToken } from '../ghl/oauth';
 import { encrypt, decrypt } from '../crypto/encryption';
@@ -23,30 +23,28 @@ export async function refreshWithLock(locationId: string) {
     // Wait briefly and then fetch the newly refreshed token from the database.
     logger.debug('Could not acquire refresh lock, waiting for other process', { locationId });
     await sleep(1500); // Wait 1.5 seconds to let the other process finish
-    
-    const supabase = getSupabaseServiceRoleClient();
-    const { data: updatedToken } = await supabase
-      .from('ghl_location_tokens')
-      .select('*')
-      .eq('location_id', locationId)
-      .single();
-      
+
+    const { rows } = await db.query(
+      'SELECT * FROM ghl_location_tokens WHERE location_id = $1',
+      [locationId],
+    );
+    const updatedToken = rows[0];
+
     if (updatedToken) {
       return updatedToken;
     }
-    
+
     throw new TokenError('Failed to retrieve refreshed token after waiting');
   }
 
   // We have the lock. Fetch the current refresh token and proceed.
-  const supabase = getSupabaseServiceRoleClient();
-  const { data: currentToken, error } = await supabase
-    .from('ghl_location_tokens')
-    .select('*')
-    .eq('location_id', locationId)
-    .single();
+  const { rows: currentRows } = await db.query(
+    'SELECT * FROM ghl_location_tokens WHERE location_id = $1',
+    [locationId],
+  );
+  const currentToken = currentRows[0];
 
-  if (error || !currentToken) {
+  if (!currentToken) {
     throw new TokenError('Token record not found for refresh');
   }
 

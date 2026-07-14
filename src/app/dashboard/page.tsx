@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getSupabaseServiceRoleClient } from "@/lib/supabase/client";
+import { db } from "@/lib/db/client";
 import { getWebhookEventsByLocation } from "@/lib/supabase/queries";
 import fs from "fs";
 import { Cable, KeyRound, ShieldAlert } from "lucide-react";
@@ -95,27 +95,24 @@ export default async function DashboardPage({
   const isNewInstall = params.success === "1" && !!bridgeKey;
 
   // Fetch bridge keys
-  const supabase = getSupabaseServiceRoleClient();
   let keys: BridgeKey[] = [];
 
   if (locationId) {
     // Primary join via bridge_locations - location_id is here
-    const { data: locs } = await supabase
-      .from("bridge_locations")
-      .select(`bridge_keys ( id, bridge_key, created_at, is_active )`)
-      .eq("location_id", locationId);
+    const { rows: locs } = await db.query(
+      `SELECT bk.id, bk.bridge_key, bk.created_at, bk.is_active
+       FROM bridge_locations bl
+       JOIN bridge_keys bk ON bk.id = bl.bridge_key_id
+       WHERE bl.location_id = $1`,
+      [locationId],
+    );
 
-    if (locs && locs.length > 0) {
-      keys = locs
-        .flatMap((l: any) => l.bridge_keys)
-        .filter((k: any) => Boolean(k?.id))
-        .map((k: any) => ({
-          id: k.id,
-          key_value: k.bridge_key,
-          created_at: k.created_at,
-          is_active: !!k.is_active,
-        }));
-    }
+    keys = locs.map((k: any) => ({
+      id: k.id,
+      key_value: k.bridge_key,
+      created_at: k.created_at,
+      is_active: !!k.is_active,
+    }));
   }
 
   // Fetch webhook events
