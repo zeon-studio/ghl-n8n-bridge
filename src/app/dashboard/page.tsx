@@ -18,6 +18,7 @@ import path from "path";
 import { AiSkill } from "./components/AiSkill";
 import { CredentialBox } from "./components/CredentialBox";
 import { DashboardShell } from "./components/DashboardShell";
+import { PromoCard } from "./components/PromoCard";
 import { SetupGuide } from "./components/SetupGuide";
 import { SuccessBanner } from "./components/SuccessBanner";
 import { TestConnection } from "./components/TestConnection";
@@ -187,121 +188,127 @@ export default async function DashboardPage({
           )}
 
           {locationId && (
-            <div className="space-y-6">
-              {/* 1. Success Message - Dismissible version */}
-              <SuccessBanner isNewInstall={isNewInstall} />
+            <div className="grid grid-cols-1 md:grid-cols-[1fr,360px] gap-6 items-start w-full">
+              <div className="space-y-6 w-full">
+                {/* 1. Success Message - Dismissible version */}
+                <SuccessBanner isNewInstall={isNewInstall} />
 
-              {/* 2. Credentials Card */}
-              <div className="grid gap-6 md:grid-cols-2">
-                <Card className="border-none bg-linear-to-br from-background via-muted/50 to-background shadow-lg hover:shadow-xl transition-shadow duration-300">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                        <Cable className="size-5" />
+                {/* 2. Credentials Card */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Card className="border-none bg-linear-to-br from-background via-muted/50 to-background shadow-lg hover:shadow-xl transition-shadow duration-300">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                          <Cable className="size-5" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg font-bold">
+                            Location ID
+                          </CardTitle>
+                          <CardDescription>
+                            Required for n8n credentials
+                          </CardDescription>
+                        </div>
                       </div>
-                      <div>
-                        <CardTitle className="text-lg font-bold">
-                          Location ID
-                        </CardTitle>
-                        <CardDescription>
-                          Required for n8n credentials
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <CredentialBox
-                      value={locationId || ""}
-                      label="Location ID"
-                      variant="primary"
-                    />
-                  </CardContent>
-                </Card>
+                    </CardHeader>
+                    <CardContent>
+                      <CredentialBox
+                        value={locationId || ""}
+                        label="Location ID"
+                        variant="primary"
+                      />
+                    </CardContent>
+                  </Card>
 
-                <Card className="border-none bg-linear-to-br from-background via-muted/50 to-background shadow-lg hover:shadow-xl transition-shadow duration-300">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-500">
-                        <KeyRound className="size-5" />
+                  <Card className="border-none bg-linear-to-br from-background via-muted/50 to-background shadow-lg hover:shadow-xl transition-shadow duration-300">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-500">
+                          <KeyRound className="size-5" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg font-bold">
+                            Bridge Key
+                          </CardTitle>
+                          <CardDescription>
+                            Secret API key for n8n
+                          </CardDescription>
+                        </div>
                       </div>
-                      <div>
-                        <CardTitle className="text-lg font-bold">
-                          Bridge Key
-                        </CardTitle>
-                        <CardDescription>
-                          Secret API key for n8n
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {bridgeKey ? (
-                      <div className="space-y-4">
-                        <CredentialBox
-                          value={bridgeKey}
-                          label="Bridge Key"
-                          variant="indigo"
-                        />
-                        <TestConnection
-                          bridgeKey={bridgeKey}
-                          locationId={locationId}
-                          baseUrl={appBaseUrl}
-                        />
-                      </div>
-                    ) : keys.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-4 text-center space-y-3">
-                        <p className="text-sm text-muted-foreground font-medium">
-                          No active bridge keys found.
-                        </p>
-                        <Link
-                          href="/api/auth/ghl"
-                          className="inline-flex items-center rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm hover:scale-105 transition-transform"
-                        >
-                          Generate New Key
-                        </Link>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {keys.slice(0, 1).map((key) => (
-                          <div key={key.id} className="space-y-4">
-                            <CredentialBox
-                              value={key.key_value}
-                              label="Bridge Key"
-                              variant="indigo"
-                            />
-                            <div className="flex items-center justify-between">
-                              <Badge
-                                variant={
-                                  key.is_active ? "default" : "secondary"
-                                }
-                                className="rounded-full px-3"
-                              >
-                                {key.is_active ? "● Active" : "Inactive"}
-                              </Badge>
-                              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
-                                Created{" "}
-                                {new Date(key.created_at).toLocaleDateString()}
-                              </span>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {bridgeKey ? (
+                        <div className="space-y-4">
+                          <CredentialBox
+                            value={bridgeKey}
+                            label="Bridge Key"
+                            variant="indigo"
+                          />
+                          <TestConnection
+                            bridgeKey={bridgeKey}
+                            locationId={locationId}
+                            baseUrl={appBaseUrl}
+                          />
+                        </div>
+                      ) : keys.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-4 text-center space-y-3">
+                          <p className="text-sm text-muted-foreground font-medium">
+                            No active bridge keys found.
+                          </p>
+                          <Link
+                            href="/api/auth/ghl"
+                            className="inline-flex items-center rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm hover:scale-105 transition-transform"
+                          >
+                            Generate New Key
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {keys.slice(0, 1).map((key) => (
+                            <div key={key.id} className="space-y-4">
+                              <CredentialBox
+                                value={key.key_value}
+                                label="Bridge Key"
+                                variant="indigo"
+                              />
+                              <div className="flex items-center justify-between">
+                                <Badge
+                                  variant={
+                                    key.is_active ? "default" : "secondary"
+                                  }
+                                  className="rounded-full px-3"
+                                >
+                                  {key.is_active ? "● Active" : "Inactive"}
+                                </Badge>
+                                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
+                                  Created{" "}
+                                  {new Date(key.created_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <TestConnection
+                                bridgeKey={key.key_value}
+                                locationId={locationId}
+                                baseUrl={appBaseUrl}
+                              />
                             </div>
-                            <TestConnection
-                              bridgeKey={key.key_value}
-                              locationId={locationId}
-                              baseUrl={appBaseUrl}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="relative group">
+                  <div className="absolute -inset-1 rounded-3xl bg-linear-to-r from-primary/20 via-indigo-500/20 to-primary/20 opacity-0 blur-xl group-hover:opacity-100 transition-opacity duration-500" />
+                  <WorkflowTemplates />
+                </div>
+
+                <SetupGuide />
               </div>
 
-              <div className="relative group">
-                <div className="absolute -inset-1 rounded-3xl bg-linear-to-r from-primary/20 via-indigo-500/20 to-primary/20 opacity-0 blur-xl group-hover:opacity-100 transition-opacity duration-500" />
-                <WorkflowTemplates />
-              </div>
-
-              <SetupGuide />
+              <aside className="w-full md:sticky md:top-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                <PromoCard />
+              </aside>
             </div>
           )}
         </TabsContent>
