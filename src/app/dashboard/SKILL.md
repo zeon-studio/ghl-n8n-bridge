@@ -25,13 +25,12 @@ The "Source" node for real-time automation.
 *   **Catalog Mode:** Subscribe to specific events. Supported events include:
     *   **Appointments:** `AppointmentCreate`, `AppointmentUpdate`, `AppointmentDelete`
     *   **Contacts:** `ContactCreate`, `ContactUpdate`, `ContactDelete`, `ContactDndUpdate`, `ContactTagUpdate`
-    *   **Conversations:** `ConversationUnreadUpdate`, `InboundMessage`, `OutboundMessage`
+    *   **Conversations:** `ConversationUnreadUpdate`, `ConversationUpdate`, `InboundMessage`, `OutboundMessage`
     *   **Locations:** `LocationCreate`, `LocationUpdate`, `LocationDelete`
     *   **Notes:** `NoteCreate`, `NoteUpdate`, `NoteDelete`
     *   **Opportunities:** `OpportunityCreate`, `OpportunityUpdate`, `OpportunityDelete`, `OpportunityStatusUpdate`, `OpportunityAssignedToUpdate`, `OpportunityMonetaryValueUpdate`, `OpportunityStageUpdate`
     *   **Tasks:** `TaskCreate`, `TaskDelete`, `TaskComplete`
-    *   **Users:** `UserCreate`, `UserUpdate`, `UserDelete`
-*   **All Events Mode:** Use `*` to capture everything happening in the GHL sub-account.
+*   **All Events Mode:** Use `*` to capture every event the app subscribes to for that GHL sub-account.
 *   **Security:** Built-in HMAC verification ensures only valid bridge traffic executes your workflow.
 
 ---

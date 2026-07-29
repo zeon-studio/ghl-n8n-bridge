@@ -32,17 +32,33 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Get associated locations
-    const { rows: locations } = await db.query(
+    const { rows: allLocations } = await db.query(
       'SELECT location_id FROM bridge_locations WHERE bridge_key_id = $1',
       [keyData.id],
     );
 
-    if (!locations || locations.length === 0) {
+    if (!allLocations || allLocations.length === 0) {
       return NextResponse.json({ error: 'No locations associated with this bridge key' }, { status: 403 });
     }
 
-    // For v1, we assume one location per bridge key for webhooks, or we register for all of them
-    // Let's register for all locations attached to this key
+    // Register only for the location the caller asked for. Without this a bridge
+    // key covering several locations gets one subscription per location, so a
+    // single GoHighLevel event fires the same workflow once per location.
+    // Callers that send no location_id keep the old register-everything behaviour.
+    const requestedLocationId =
+      new URL(req.url).searchParams.get('location_id') ?? body.location_id ?? null;
+
+    let locations = allLocations;
+    if (requestedLocationId) {
+      locations = allLocations.filter((loc) => loc.location_id === requestedLocationId);
+      if (locations.length === 0) {
+        return NextResponse.json(
+          { error: 'Bridge key is not authorized for the requested location' },
+          { status: 403 },
+        );
+      }
+    }
+
     let createdSubs;
     try {
       createdSubs = await Promise.all(
