@@ -23,7 +23,7 @@ const FEATURES = [
     n: 2,
     icon: ShieldCheck,
     title: "Token Broker Architecture",
-    desc: "We handle OAuth token refreshes securely in the background so your automations never break.",
+    desc: "We refresh OAuth tokens securely in the background, so expiring credentials stay out of your workflows.",
   },
   {
     n: 3,
