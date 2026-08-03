@@ -55,7 +55,25 @@ export async function dispatchEventDirect(
   eventType: string,
   payload: WebhookEventPayload,
 ): Promise<DirectDispatchResult> {
-  // Create an initial log entry for visibility in the dashboard
+  // Find out who wants this event before writing anything. GoHighLevel sends
+  // every enabled event for every install, and a location typically subscribes
+  // to a handful of them, so logging the unmatched ones stored a full payload
+  // per event that no dashboard ever reads. That was ~94% of this table.
+  const { rows: subscriptions } = await db.query(
+    "SELECT * FROM webhook_subscriptions WHERE location_id = $1 AND is_active = true",
+    [locationId],
+  );
+
+  const matched = (subscriptions ?? []).filter(
+    (sub) =>
+      sub.event_types.includes("*") || sub.event_types.includes(eventType),
+  );
+
+  if (matched.length === 0) {
+    return { matchedSubscriptions: 0, delivered: 0, failed: 0 };
+  }
+
+  // Create a log entry for visibility in the dashboard
   const eventId =
     payload.id ||
     crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
@@ -68,40 +86,6 @@ export async function dispatchEventDirect(
     [locationId, eventType, JSON.stringify(payload), idempotencyKey],
   );
   const eventRecord = eventRows[0];
-
-  const { rows: subscriptions } = await db.query(
-    "SELECT * FROM webhook_subscriptions WHERE location_id = $1 AND is_active = true",
-    [locationId],
-  );
-
-  if (!subscriptions || subscriptions.length === 0) {
-    if (eventRecord) {
-      await db.query(
-        `UPDATE webhook_events
-         SET status = 'completed', error_message = $2, processed_at = now()
-         WHERE id = $1`,
-        [eventRecord.id, "No active subscriptions found for this location"],
-      );
-    }
-    return { matchedSubscriptions: 0, delivered: 0, failed: 0 };
-  }
-
-  const matched = subscriptions.filter(
-    (sub) =>
-      sub.event_types.includes("*") || sub.event_types.includes(eventType),
-  );
-
-  if (matched.length === 0) {
-    if (eventRecord) {
-      await db.query(
-        `UPDATE webhook_events
-         SET status = 'completed', error_message = $2, processed_at = now()
-         WHERE id = $1`,
-        [eventRecord.id, "No matching subscriptions for this event type"],
-      );
-    }
-    return { matchedSubscriptions: 0, delivered: 0, failed: 0 };
-  }
 
   let delivered = 0;
   let failed = 0;
@@ -292,4 +276,29 @@ export async function dispatchPendingEvents(limit: number = 50) {
   }
 
   return processedCount;
+}
+
+/**
+ * Deletes delivered webhook events older than the retention window. The
+ * dashboard only ever shows the 50 most recent events per location and never
+ * reads the payload, so keeping months of history buys nothing and is what
+ * pushed the database past its storage allowance. Events still awaiting
+ * delivery or parked in the dead-letter queue are never pruned.
+ */
+export async function pruneOldEvents(
+  retentionDays = Number(process.env.WEBHOOK_EVENT_RETENTION_DAYS ?? 7),
+): Promise<number> {
+  const { rowCount } = await db.query(
+    `DELETE FROM webhook_events
+     WHERE status = 'completed'
+       AND created_at < now() - ($1 || ' days')::interval`,
+    [retentionDays],
+  );
+
+  const deleted = rowCount ?? 0;
+  if (deleted > 0) {
+    logger.info("Pruned old webhook events", { deleted, retentionDays });
+  }
+
+  return deleted;
 }

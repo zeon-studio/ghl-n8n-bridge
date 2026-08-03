@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dispatchPendingEvents } from '@/lib/webhook/queue';
+import { dispatchPendingEvents, pruneOldEvents } from '@/lib/webhook/queue';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -15,12 +15,14 @@ export async function GET(req: NextRequest) {
 
   try {
     const processedCount = await dispatchPendingEvents(50); // Process up to 50 per run
-    
+
     if (processedCount > 0) {
       logger.info('Cron dispatched pending webhooks', { count: processedCount });
     }
-    
-    return NextResponse.json({ success: true, processedCount });
+
+    const prunedCount = await pruneOldEvents();
+
+    return NextResponse.json({ success: true, processedCount, prunedCount });
   } catch (error) {
     logger.error('Failed to dispatch webhooks via cron', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
