@@ -161,7 +161,7 @@ export default function Home() {
           </div>
 
           {/* ── Footer ── */}
-          <footer className="mt-8 flex w-full items-center justify-center gap-6 border-t pt-6 text-sm text-muted-foreground">
+          <footer className="mt-8 flex w-full flex-wrap items-center justify-center gap-6 border-t pt-6 text-sm text-muted-foreground">
             <Link
               href="/privacy"
               className="transition-colors hover:text-foreground"
@@ -179,6 +179,12 @@ export default function Home() {
               className="transition-colors hover:text-foreground"
             >
               Support
+            </Link>
+            <Link
+              href="/admin"
+              className="transition-colors font-medium text-primary/80 hover:text-primary"
+            >
+              Admin Console
             </Link>
           </footer>
         </div>
