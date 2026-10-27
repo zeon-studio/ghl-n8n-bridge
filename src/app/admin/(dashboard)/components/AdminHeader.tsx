@@ -1,7 +1,6 @@
 "use client";
 
 import { ModeToggle } from "@/components/mode-toggle";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -68,40 +67,20 @@ export function AdminHeader() {
           </Button>
 
           {/* Breadcrumb / Title */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden sm:inline">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="font-medium text-muted-foreground hidden sm:inline">
               Admin
             </span>
-            <span className="text-xs text-muted-foreground/60 hidden sm:inline">
-              /
-            </span>
-            <h1 className="text-base sm:text-lg font-bold tracking-tight">
+            <span className="text-muted-foreground/50 hidden sm:inline">/</span>
+            <h1 className="font-semibold text-foreground tracking-tight">
               {currentItem.name}
             </h1>
           </div>
         </div>
 
-        {/* Right side controls */}
-        <div className="flex items-center gap-2.5 sm:gap-3">
-          <Badge
-            variant="outline"
-            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono uppercase bg-emerald-500/5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-          >
-            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Live Broker
-          </Badge>
-
+        {/* Right side controls - only lightmode toggle with top/bottom padding */}
+        <div className="flex items-center py-2 sm:py-3">
           <ModeToggle />
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-            className="hidden md:inline-flex text-xs text-muted-foreground hover:text-destructive gap-1.5 h-8 rounded-lg cursor-pointer"
-          >
-            <LogOut className="size-3.5" />
-            <span>Sign Out</span>
-          </Button>
         </div>
       </header>
 
